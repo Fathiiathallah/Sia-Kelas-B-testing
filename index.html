@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIAKAD Kelas B — Login</title>
+  <meta name="description" content="Sistem Informasi Akademik Kelas B — Login untuk mahasiswa, dosen, dan admin kelas." />
+  <link rel="stylesheet" href="css/global.css" />
+  <link rel="stylesheet" href="css/login.css" />
+</head>
+<body class="login-body">
+
+  <div class="login-bg"></div>
+  <div id="particles-container"></div>
+
+  <div class="login-card" id="login-card">
+    <!-- Logo -->
+    <div class="login-logo">
+      <div class="login-logo-icon">🎓</div>
+      <span class="login-logo-text">SIAKAD</span>
+    </div>
+    <p class="login-tagline">Sistem Informasi Akademik · Kelas B</p>
+
+    <!-- Step 1: Role Selection -->
+    <div id="step-role" class="role-step">
+      <h3>Pilih peran Anda</h3>
+      <div class="role-cards">
+        <div class="role-card" data-role="mahasiswa" onclick="selectRole('mahasiswa')">
+          <span class="role-card-icon">🎓</span>
+          <span class="role-card-label">Mahasiswa</span>
+        </div>
+        <div class="role-card" data-role="dosen" onclick="selectRole('dosen')">
+          <span class="role-card-icon">👨‍🏫</span>
+          <span class="role-card-label">Dosen</span>
+        </div>
+        <div class="role-card" data-role="admin" onclick="selectRole('admin')">
+          <span class="role-card-icon">⚙️</span>
+          <span class="role-card-label">Admin Kelas</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Credentials -->
+    <div id="step-cred" class="cred-step hidden">
+      <button class="back-btn" onclick="goBack()">← Kembali</button>
+
+      <div class="role-badge-header" id="role-badge">
+        <span class="role-icon" id="cred-role-icon"></span>
+        <div>
+          <div class="role-info-name" id="cred-role-name"></div>
+          <div class="role-info-desc" id="cred-role-desc"></div>
+        </div>
+      </div>
+
+      <!-- User list (for dosen & mahasiswa) -->
+      <div id="user-list-wrap" class="form-group">
+        <label class="form-label">Pilih Akun</label>
+        <div id="user-list"></div>
+      </div>
+
+      <!-- Admin direct -->
+      <div id="admin-wrap" class="form-group hidden">
+        <label class="form-label">Username</label>
+        <input type="text" id="admin-username" class="form-input" value="Admin Kelas B" readonly />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="password-input" class="form-input" placeholder="Masukkan password..." />
+      </div>
+
+      <div id="login-error" class="login-error hidden"></div>
+      <button class="login-btn" onclick="doLogin()">Masuk →</button>
+      <p class="login-hint">Password default: <strong>1234</strong> (mahasiswa/dosen) · <strong>admin123</strong> (admin)</p>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    // Init seed data
+    initSeedData();
+
+    // Redirect if already logged in
+    if (Auth.getSession()) window.location.href = 'dashboard.html';
+
+    // Floating particles
+    const pc = document.getElementById('particles-container');
+    for (let i = 0; i < 18; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const size = Math.random() * 8 + 3;
+      p.style.cssText = `
+        width:${size}px; height:${size}px;
+        left:${Math.random()*100}%;
+        animation-duration:${Math.random()*20+12}s;
+        animation-delay:-${Math.random()*20}s;
+        opacity:${Math.random()*.12+.04};
+        background: ${['#6366F1','#22D3EE','#F43F5E'][Math.floor(Math.random()*3)]};
+      `;
+      pc.appendChild(p);
+    }
+
+    const ROLE_META = {
+      mahasiswa: { icon:'🎓', name:'Mahasiswa',   desc:'Lihat tugas, jadwal & absensi' },
+      dosen:     { icon:'👨‍🏫', name:'Dosen',       desc:'Kelola tugas & sesi absensi' },
+      admin:     { icon:'⚙️',  name:'Admin Kelas', desc:'Kelola jadwal & data kelas' },
+    };
+
+    let selectedRole = null;
+    let selectedUserId = null;
+
+    function selectRole(role) {
+      selectedRole = role;
+      selectedUserId = null;
+
+      // Highlight card
+      document.querySelectorAll('.role-card').forEach(c => c.classList.toggle('selected', c.dataset.role === role));
+
+      // Fill badge
+      const meta = ROLE_META[role];
+      document.getElementById('cred-role-icon').textContent = meta.icon;
+      document.getElementById('cred-role-name').textContent = meta.name;
+      document.getElementById('cred-role-desc').textContent = meta.desc;
+
+      // Show/hide user list
+      const userListWrap = document.getElementById('user-list-wrap');
+      const adminWrap    = document.getElementById('admin-wrap');
+
+      if (role === 'admin') {
+        userListWrap.classList.add('hidden');
+        adminWrap.classList.remove('hidden');
+        selectedUserId = 'u9';
+      } else {
+        adminWrap.classList.add('hidden');
+        userListWrap.classList.remove('hidden');
+        const users = Users.where(u => u.role === role);
+        const list  = document.getElementById('user-list');
+        list.innerHTML = users.map(u => `
+          <div class="user-option" data-id="${u.id}" onclick="selectUser('${u.id}', this)">
+            <span class="user-option-avatar">${u.avatar}</span>
+            <div>
+              <div class="user-option-name">${u.name}</div>
+              <div class="user-option-id">${u.nim || u.nip || ''}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Switch to step 2
+      document.getElementById('step-role').classList.add('hidden');
+      document.getElementById('step-cred').classList.remove('hidden');
+      document.getElementById('password-input').value = '';
+      document.getElementById('login-error').classList.add('hidden');
+    }
+
+    function selectUser(id, el) {
+      selectedUserId = id;
+      document.querySelectorAll('.user-option').forEach(e => e.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function goBack() {
+      selectedRole = null; selectedUserId = null;
+      document.getElementById('step-cred').classList.add('hidden');
+      document.getElementById('step-role').classList.remove('hidden');
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+    }
+
+    function doLogin() {
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+
+      if (!selectedUserId) { showErr('Pilih akun terlebih dahulu.'); return; }
+      const password = document.getElementById('password-input').value;
+      if (!password) { showErr('Masukkan password.'); return; }
+
+      const result = Auth.login(selectedUserId, password);
+      if (!result.ok) { showErr(result.msg); return; }
+      window.location.href = 'dashboard.html';
+    }
+
+    function showErr(msg) {
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+
+    // Enter key support
+    document.getElementById('password-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+  </script>
+</body>
+</html>
